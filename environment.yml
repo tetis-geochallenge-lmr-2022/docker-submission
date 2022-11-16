@@ -1,0 +1,9 @@
+name: geochallengelite
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - pandas
+  - pytorch
+  - scikit-learn
+  - transformers
