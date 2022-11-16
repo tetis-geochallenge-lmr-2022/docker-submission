@@ -28,6 +28,9 @@ sudo docker build -t geochallenge-test .
 ```
 
 ## 3. Run container 
+```bash
+sudo docker run geochallenge-test
+```
 
 ## Troubleshooting
 1. Not enough space. remove old containers and images
