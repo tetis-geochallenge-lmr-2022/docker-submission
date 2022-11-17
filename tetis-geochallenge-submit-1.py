@@ -1,60 +1,36 @@
-import torch.nn as nn
-import torch
-import numpy as np
-from sklearn.metrics import multilabel_confusion_matrix
-from tqdm.notebook import tqdm
-tqdm.pandas()
-from transformers import RobertaForTokenClassification, RobertaModel, RobertaTokenizerFast
+"""
+Tetis Geochallenge sybmit 1
+"""
+__author__ = "Remy Decoupes, UMR TETIS, INRAE"
+__credits__ = "Rémy DECOUPES"
+
+
+from transformers import RobertaForTokenClassification, RobertaTokenizerFast
 from transformers import pipeline
+import json
+import pandas as pd
+from tqdm import tqdm
 
-def infer(list_tokens, model):
-    """
-    Made a prediction from a sentence in a shape of list of token (BILOU files)
-    """
-    inputs = tokenizer(list_tokens, truncation=True, is_split_into_words=True, return_tensors="pt")
-    outputs = model(**inputs)
-    return outputs
+def jsonstr_to_df(json_str):
+    return pd.json_normalize(json.loads(json_str))
 
-def get_label_from_infer(list_tokens, model):
-    """
-    Get the label name predicted for each token (taking care of subword from roberta tokenizer)
-    """
-    try:
-        softmax = nn.Softmax(dim=-1)
-        outputs = infer(list_tokens, model)
-        predictions = softmax(outputs.logits) # compute softmax
-        labelled_predicted = torch.max(predictions, -1)[1][0] # get the label id for which the softmax is the greater
-        label_names_predicted = []
-        # Because of words are split into subword when they are out of Roberta vocabulary
-        # so we detect those subwords and remove the label predicted associated
-        label_ids = []
-        tokenized_inputs = tokenizer(list_tokens, truncation=True, is_split_into_words=True, return_tensors="pt")
-        words_ids = tokenized_inputs.word_ids()
-        previous_word_idx = None
-        for j, token in enumerate(words_ids):
-            if token is None: # we remove the CLF and SEP tokens
-                pass
-            elif token != previous_word_idx: # it's a new word (in the Roberta vocabulary) not a sub word
-                label_ids.append(int(labelled_predicted[j]))
-            else:
-                pass
-            previous_word_idx = token
-            # labels.append(label_ids)
-        labelled_predicted = label_ids
-        # end subword labels remoging
+def nlp_results_to_location_mentions(entities):
+    list_location_mentions = []
+    for ent in entities:
+        location_mention = {
+            "text": ent["word"],
+            "start_offset": ent["start"],
+            "end_offset": ent["end"]
+        }
+        list_location_mentions.append(location_mention)
+    return list_location_mentions
 
-        for label in labelled_predicted: # convert id to label names
-            label_names_predicted.append(model.config.id2label[int(label)])
-        return label_names_predicted
-    except:
-        np.nan
-
-
-models_saved_path = "/geoai/"
+# Load checkpoint weight
 label_encoding_dict_type_less = {"O": 0, "B-LOC": 1, "U-LOC": 2, "I-LOC": 3, "L-LOC": 4}
 label_list_type_less = ["O", "B-LOC", "U-LOC", "I-LOC", "L-LOC"]
 id2label = {i: label for i, label in enumerate(label_list_type_less)}
 label2id = {v: k for k, v in id2label.items()}
+models_saved_path = "./geoai/"
 model_name = "all_event_roberta-base_typeless-True_mode_strict-True_batchsize-32_geonlplify-False_epoch-6.model"
 model_path = models_saved_path + model_name
 model = RobertaForTokenClassification.from_pretrained(model_path,
@@ -63,15 +39,30 @@ model = RobertaForTokenClassification.from_pretrained(model_path,
                                                      )
 tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
 
-# With pipeline
-nlp = pipeline("ner", model=model, tokenizer=tokenizer)
 
-example = "My name is Wolfgang and I live in Berlin"
+with open('geoai/input.jsonl', 'r') as json_file:
+    json_list = list(json_file)
 
-ner_results = nlp(example)
-print(ner_results)
+df = pd.concat(map(jsonstr_to_df, json_list))
 
-# with model outputs
-inputs = tokenizer(example, return_tensors="pt")
-outputs = model(**inputs)
-print(outputs)
+# transforms bilou format into IOB in order to do an aggregation
+nlp = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+nlp.model.config.id2label = {k: v.replace('L-', 'I-').replace('U-', 'B-') for k, v in nlp.model.config.id2label.items()}
+
+tqdm.pandas()
+df["predicted"] = df["text"].progress_apply(nlp)
+df["location_mentions"] = df["predicted"].progress_apply(nlp_results_to_location_mentions)
+
+output_jsonl = df[["tweet_id", "location_mentions"]].to_json(orient="records", lines=True)
+f_output_jsonl = open("./geoai/output.jsonl", "w")
+f_output_jsonl.write(output_jsonl)
+f_output_jsonl.close()
+
+"""
+TODO:
+ - use jsonl file as an input : ok
+ - apply pipeline on tweet : ok
+ - remove subtokens : ok
+ - start building a jsonl output file : ok
+ - check output.jsonl format 
+"""

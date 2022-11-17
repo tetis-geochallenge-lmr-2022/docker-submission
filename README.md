@@ -32,6 +32,35 @@ sudo docker build -t geochallenge-test .
 sudo docker run geochallenge-test
 ```
 
+## 4. Code 
+Transform BILOU to IOB for aggregating sub-token:
+```python
+example = "My name is Wolfgang and I live in New York City, US"
+
+nlp = pipeline("ner", model=model, tokenizer=tokenizer)
+ner_results = nlp(example)
+print(ner_results)
+# >>> [{'entity': 'B-LOC', 'score': 0.9750616, 'index': 9, 'word': 'ĠNew', 'start': 34, 'end': 37}, {'entity': 'I-LOC', 'score': 0.8160579, 'index': 10, 'word': 'ĠYork', 'start': 38, 'end': 42}, {'entity': 'L-LOC', 'score': 0.8318275, 'index': 11, 'word': 'ĠCity', 'start': 43, 'end': 47}, {'entity': 'U-LOC', 'score': 0.7664982, 'index': 13, 'word': 'ĠUS', 'start': 49, 'end': 51}]
+```
+- aggregate subtokens (but without convert BILOU into IOB:
+```python
+# aggregate subtokens (but without convert BILOU into IOB
+nlp = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+ner_results = nlp(example)
+print(ner_results)
+# >>> [{'entity_group': 'LOC', 'score': 0.8955598, 'word': ' New York', 'start': 34, 'end': 42}, {'entity_group': 'LOC', 'score': 0.8318275, 'word': ' City', 'start': 43, 'end': 47}, {'entity_group': 'LOC', 'score': 0.7664982, 'word': ' US', 'start': 49, 'end': 51}]
+```
+- convert BILOU into IOB:
+```python
+# convert BILOU into IOB
+nlp.model.config.id2label = {k: v.replace('L-', 'I-').replace('U-', 'B-') for k, v in nlp.model.config.id2label.items()}
+# aggregate
+nlp = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+ner_results = nlp(example)
+print(ner_results)
+# >>> [{'entity_group': 'LOC', 'score': 0.87431574, 'word': ' New York City', 'start': 34, 'end': 47}, {'entity_group': 'LOC', 'score': 0.7664982, 'word': ' US', 'start': 49, 'end': 51}]
+```
+
 ## Troubleshooting
 1. Not enough space. remove old containers and images
 ```bash
