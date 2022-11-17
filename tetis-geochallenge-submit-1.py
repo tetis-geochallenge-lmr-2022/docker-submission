@@ -11,12 +11,36 @@ import json
 import pandas as pd
 from tqdm import tqdm
 
+def preprocessing(tweet_text):
+    # remove hashtag
+    tweet_text = tweet_text.replace("#", " ")
+    return tweet_text
+
 def jsonstr_to_df(json_str):
     return pd.json_normalize(json.loads(json_str))
 
 def nlp_results_to_location_mentions(entities):
     list_location_mentions = []
+    # trouble with pipeline tokenizer that can't aggregate successfully the subtokens
+    for_restart = True
+    while(for_restart):
+        for_restart = False
+        if len(entities) > 1:
+            for i, ent in enumerate(entities):
+                try:
+                    if entities[i]["end"] == entities[i+1]["start"]:# they are subtokens
+                        entities[i]["word"] = entities[i]["word"] + entities[i+1]["word"]
+                        entities[i]["end"] = entities[i+1]["end"]
+                        entities.remove(entities[i+1])
+                        for_restart = True
+                        break
+                except:
+                    continue
+
     for ent in entities:
+        # trouble with pipeline tokenizer: it often puts a white space at the beginning of the token
+        if ent["word"].startswith(" "):
+            ent["word"] = ent["word"][1:]
         location_mention = {
             "text": ent["word"],
             "start_offset": ent["start"],
@@ -25,38 +49,43 @@ def nlp_results_to_location_mentions(entities):
         list_location_mentions.append(location_mention)
     return list_location_mentions
 
-# Load checkpoint weight
-label_encoding_dict_type_less = {"O": 0, "B-LOC": 1, "U-LOC": 2, "I-LOC": 3, "L-LOC": 4}
-label_list_type_less = ["O", "B-LOC", "U-LOC", "I-LOC", "L-LOC"]
-id2label = {i: label for i, label in enumerate(label_list_type_less)}
-label2id = {v: k for k, v in id2label.items()}
-models_saved_path = "./geoai/"
-model_name = "all_event_roberta-base_typeless-True_mode_strict-True_batchsize-32_geonlplify-False_epoch-6.model"
-model_path = models_saved_path + model_name
-model = RobertaForTokenClassification.from_pretrained(model_path,
-                                                      id2label=id2label,
-                                                      label2id = label2id
-                                                     )
-tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
+if __name__ == "__main__":
+    # Load checkpoint weight
+    label_encoding_dict_type_less = {"O": 0, "B-LOC": 1, "U-LOC": 2, "I-LOC": 3, "L-LOC": 4}
+    label_list_type_less = ["O", "B-LOC", "U-LOC", "I-LOC", "L-LOC"]
+    id2label = {i: label for i, label in enumerate(label_list_type_less)}
+    label2id = {v: k for k, v in id2label.items()}
+    models_saved_path = "./geoai/"
+    model_name = "all_event_roberta-base_typeless-True_mode_strict-True_batchsize-32_geonlplify-False_epoch-6.model"
+    model_path = models_saved_path + model_name
+    model = RobertaForTokenClassification.from_pretrained(model_path,
+                                                          id2label=id2label,
+                                                          label2id = label2id
+                                                         )
 
+    tokenizer = RobertaTokenizerFast.from_pretrained(model_path, return_tensors="pt", add_prefix_space=True)
+    # from tokenizers import pre_tokenizers
+    # from tokenizers.pre_tokenizers import Punctuation, WhitespaceSplit, Metaspace
+    # tokenizer._tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Metaspace()])
 
-with open('geoai/input.jsonl', 'r') as json_file:
-    json_list = list(json_file)
+    with open('geoai/input.jsonl', 'r') as json_file:
+        json_list = list(json_file)
 
-df = pd.concat(map(jsonstr_to_df, json_list))
+    df = pd.concat(map(jsonstr_to_df, json_list))
 
-# transforms bilou format into IOB in order to do an aggregation
-nlp = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
-nlp.model.config.id2label = {k: v.replace('L-', 'I-').replace('U-', 'B-') for k, v in nlp.model.config.id2label.items()}
+    # transforms bilou format into IOB in order to do an aggregation
+    nlp = pipeline("ner", model=model, tokenizer=tokenizer, aggregation_strategy="simple")
+    nlp.model.config.id2label = {k: v.replace('L-', 'I-').replace('U-', 'B-') for k, v in nlp.model.config.id2label.items()}
 
-tqdm.pandas()
-df["predicted"] = df["text"].progress_apply(nlp)
-df["location_mentions"] = df["predicted"].progress_apply(nlp_results_to_location_mentions)
+    tqdm.pandas()
+    df["text"] = df["text"].progress_apply(preprocessing)
+    df["predicted"] = df["text"].progress_apply(nlp)
+    df["location_mentions"] = df["predicted"].progress_apply(nlp_results_to_location_mentions)
 
-output_jsonl = df[["tweet_id", "location_mentions"]].to_json(orient="records", lines=True)
-f_output_jsonl = open("./geoai/output.jsonl", "w")
-f_output_jsonl.write(output_jsonl)
-f_output_jsonl.close()
+    output_jsonl = df[["tweet_id", "location_mentions"]].to_json(orient="records", lines=True)
+    f_output_jsonl = open("./geoai/output.jsonl", "w")
+    f_output_jsonl.write(output_jsonl)
+    f_output_jsonl.close()
 
 """
 TODO:
