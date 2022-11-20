@@ -31,7 +31,7 @@ sudo docker build -t geochallenge-test .
 ```bash
 sudo docker run \
 -v input.jsonl:/geoai/input.jsonl:ro \
--v output.jsonl:/geoai/input.jsonl \
+-v output.jsonl:/geoai/output.jsonl \
 geochallenge-test
 ```
 
