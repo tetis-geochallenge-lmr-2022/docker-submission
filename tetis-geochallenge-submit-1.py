@@ -13,7 +13,11 @@ from tqdm import tqdm
 
 def preprocessing(tweet_text):
     # remove hashtag
-    tweet_text = tweet_text.replace("#", " ")
+    if tweet_text[0] == "#": # if it's at the beginning of the sentence, we remove # by "." because otherwise tokenizer remove a character
+        # tweet_text = "." + tweet_text[1:]
+        pass
+    else:
+        tweet_text = tweet_text.replace("#", " ")
     return tweet_text
 
 def jsonstr_to_df(json_str):
@@ -41,6 +45,9 @@ def nlp_results_to_location_mentions(entities):
         # trouble with pipeline tokenizer: it often puts a white space at the beginning of the token
         if ent["word"].startswith(" "):
             ent["word"] = ent["word"][1:]
+        if ent["word"].startswith("#"): # we remove '#' if any
+            ent["word"] = ent["word"][1:]
+            ent["start"] = ent["start"] + 1
         location_mention = {
             "text": ent["word"],
             "start_offset": ent["start"],
@@ -55,7 +62,7 @@ if __name__ == "__main__":
     label_list_type_less = ["O", "B-LOC", "U-LOC", "I-LOC", "L-LOC"]
     id2label = {i: label for i, label in enumerate(label_list_type_less)}
     label2id = {v: k for k, v in id2label.items()}
-    models_saved_path = "./geoai/"
+    models_saved_path = "/geoai/"
     model_name = "all_event_roberta-base_typeless-True_mode_strict-True_batchsize-32_geonlplify-False_epoch-6.model"
     model_path = models_saved_path + model_name
     model = RobertaForTokenClassification.from_pretrained(model_path,
@@ -68,7 +75,7 @@ if __name__ == "__main__":
     # from tokenizers.pre_tokenizers import Punctuation, WhitespaceSplit, Metaspace
     # tokenizer._tokenizer.pre_tokenizer = pre_tokenizers.Sequence([Metaspace()])
 
-    with open('geoai/input.jsonl', 'r') as json_file:
+    with open('/geoai/input.jsonl', 'r') as json_file:
         json_list = list(json_file)
 
     df = pd.concat(map(jsonstr_to_df, json_list))
@@ -93,5 +100,10 @@ TODO:
  - apply pipeline on tweet : ok
  - remove subtokens : ok
  - start building a jsonl output file : ok
- - check output.jsonl format 
+ - check output.jsonl format :ok
+ - test with different input.jsonl file
+ - work on docker that accepts a inputs.jsonl mounted filed and write a output.jsonl mounted file 
+ - check with colleagues
+ - upload docker in dockerhub
+ - submit to the geochallenge
 """

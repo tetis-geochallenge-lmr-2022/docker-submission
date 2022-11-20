@@ -1,3 +1,4 @@
 # data and models weight
 geoai/
 *.jsonl
+.ipynb_checkpoints/
