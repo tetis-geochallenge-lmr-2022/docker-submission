@@ -30,8 +30,8 @@ sudo docker build -t geochallenge-test .
 ## 3. Run container 
 ```bash
 sudo docker run \
--v input.jsonl:/geoai/input.jsonl:ro \
--v output.jsonl:/geoai/output.jsonl \
+-v "$(pwd)"/input.jsonl:/geoai/input.jsonl:ro \
+-v "$(pwd)"/output.jsonl:/geoai/output.jsonl \
 geochallenge-test
 ```
 
