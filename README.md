@@ -34,6 +34,11 @@ sudo docker run \
 -v "$(pwd)"/output.jsonl:/geoai/output.jsonl \
 geochallenge-test
 ```
+:warning: output.jsonl file must exisit and write permission must be granted to the docker user:
+```bash
+touch output.jsonl
+chmod o+w output.jsonl
+```
 
 ## 4. Code 
 ### 4.1 Main script
