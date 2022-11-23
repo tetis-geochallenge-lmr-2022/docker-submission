@@ -29,10 +29,7 @@ sudo docker build -t [dockerhub_user/image] .
 
 ## 3. Run container 
 ```bash
-sudo docker run \
--v "$(pwd)"/input.jsonl:/geoai/input.jsonl:ro \
--v "$(pwd)"/output.jsonl:/geoai/output.jsonl \
-geochallenge-test
+sudo docker run --rm -v ${PWD}:/geoai/ -it [usernmane/image]
 ```
 :warning: output.jsonl file must exisit and write permission must be granted to the docker user:
 ```bash
