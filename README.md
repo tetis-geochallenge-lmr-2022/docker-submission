@@ -24,7 +24,7 @@
 
 ## 2. Build docker image
 ```bash
-sudo docker build -t geochallenge-test .
+sudo docker build -t [dockerhub_user/image] .
 ```
 
 ## 3. Run container 
@@ -38,6 +38,17 @@ geochallenge-test
 ```bash
 touch output.jsonl
 chmod o+w output.jsonl
+```
+
+### 3.2 push and pull image on docker hub
+**Push**
+```bash
+sudo docker login
+sudo docker push [username/image]
+```
+**Pull**
+```bash
+sudo docker pull nephredil/submit2
 ```
 
 ## 4. Code 

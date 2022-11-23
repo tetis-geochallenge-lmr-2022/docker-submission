@@ -3,3 +3,4 @@ geoai/
 *.jsonl
 .ipynb_checkpoints/
 .nfs00000000200a6d3a00000014
+all_event_roberta-base_typeless-True_mode_strict-True_batchsize-32_geonlplify-False_epoch-6.model
